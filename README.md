@@ -22,6 +22,10 @@ The reference beside the editor lists every function. Mini-notation supports `~`
 
 **Two decks and a mixer.** Each deck starts with a demo loop. You can also drop in your own MP3, WAV, OGG or M4A file. Decks have cue, loop, tempo ±20%, tap tempo, BPM detection and Sync (matches tempo and beat). The mixer has 3-band EQ, a filter that sweeps from low-pass to high-pass, channel faders and an equal-power crossfader.
 
-**Drum machine.** A 16-step grid with kick, snare, clap, hat and open hat. It shares its tempo with the live code.
+**Drum machine.** A 16-step grid with kick, snare, clap, rim, hat, open hat, shaker, tom, cowbell and crash. Click a step to cycle it: on, accent, ghost (soft), off. It shares its tempo with the live code, and on a phone each drum shows as two lines of 8 steps.
+
+**Groove.** **Add groove** sets swing and humanize, accents the off-beat hats, and adds ghost snares and shaker in one click. You can also pick a feel (house bounce, UK garage shuffle, lazy hip-hop, triplet shuffle) or set the Swing (50–75%) and Humanize sliders yourself. Groove applies to the drums, the live code and your loop. In code, `.swing(62)` and `.humanize(0.3)` set it for one layer.
+
+Live-code drum names: `bd sd cp hh oh rim lt mt ht conga sh cb cr rd 808`.
 
 All sounds are synthesized with the Web Audio API, so there are no sample downloads.

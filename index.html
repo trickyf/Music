@@ -140,15 +140,23 @@ input[type=range].v::-moz-range-track { width: 4px; height: 100%; }
 .seq-bpm { display: flex; align-items: center; gap: 10px; min-width: 220px; flex: 0 1 300px; }
 .seq-bpm output { font-family: var(--mono); min-width: 64px; font-variant-numeric: tabular-nums; }
 .seq { --c: var(--fg); }
-.grid-scroll { overflow-x: auto; }
-.grid { display: grid; grid-template-columns: 70px repeat(16, minmax(26px, 1fr)); gap: 5px; min-width: 560px; }
+.grid { display: grid; gap: 5px; }
+.seq-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; align-items: center; }
+.cells { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 5px; }
 .row-name { font-family: var(--display); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); align-self: center; }
 .step { height: 34px; border-radius: 3px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; padding: 0; }
 .step.beat { background: #2a2f3c; }
 .step[aria-pressed="true"] { background: var(--fg); border-color: var(--fg); }
-.step.bar2[aria-pressed="true"] { background: var(--a); border-color: var(--a); }
+.step[data-level="accent"] { background: var(--a); border-color: var(--a); }
+.step[data-level="ghost"] { background: var(--muted); border-color: var(--muted); }
+.groove { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.groove-row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.groove-ctl { display: flex; align-items: center; gap: 8px; flex: 0 1 230px; min-width: 180px; }
+.groove-ctl output { font-family: var(--mono); font-size: 12px; min-width: 36px; font-variant-numeric: tabular-nums; }
+.groove .hint { max-width: 80ch; }
 .step.now { box-shadow: 0 0 0 2px var(--b); }
-.step:nth-child(17n+6), .step:nth-child(17n+10), .step:nth-child(17n+14) { margin-left: 4px; }
+/* gap between each beat of four steps */
+.cells .step:nth-child(4n+5) { margin-left: 4px; }
 
 .chord-now { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--c); margin-top: 6px; line-height: 1; min-height: 18px; }
 
@@ -200,6 +208,17 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); 
 .loop-bar.rec i { background: var(--hot); }
 
 @media (max-width: 860px) { .code { grid-template-columns: 1fr; } }
+/* portrait: each drum gets two lines of 8 steps (one bar = 1-8 then 9-16) */
+@media (max-width: 640px) {
+  .seq-row { grid-template-columns: 58px minmax(0, 1fr); gap: 6px; padding-block: 4px; border-bottom: 1px solid var(--line); }
+  .cells { grid-template-columns: repeat(8, minmax(0, 1fr)); row-gap: 4px; }
+  .cells .step:nth-child(4n+5) { margin-left: 0; }
+  .cells .step:nth-child(8n+5) { margin-left: 4px; }
+  .step { height: 36px; }
+  .row-name { font-size: 11px; letter-spacing: .04em; }
+  .seq-bpm { flex: 1 1 100%; }
+  .groove-ctl { flex: 1 1 100%; }
+}
 @media (max-width: 640px) { .keys-body { grid-template-columns: 1fr; } .held .chord-big { font-size: 32px; } }
 @media (max-width: 980px) {
   .booth { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -256,7 +275,7 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); 
       <div class="ref">
         <dl>
           <dt>$: …</dt><dd>One line per layer. <code>_$:</code> mutes it.</dd>
-          <dt>s("bd sd hh")</dt><dd>Drums: bd, sd, cp, hh, oh. <code>~</code> is a rest.</dd>
+          <dt>s("bd sd hh")</dt><dd>Drums: bd sd cp hh oh rim lt mt ht conga sh cb cr rd 808. <code>~</code> is a rest.</dd>
           <dt>note("c3 e3 g3")</dt><dd>Notes by name or MIDI number.</dd>
           <dt>chord("&lt;Am F C G&gt;")</dt><dd>Chords: m, 7, m7, maj7, sus4, dim…</dd>
           <dt>[a b] &lt;a b&gt; a*4</dt><dd>Squeeze into one step, alternate each bar, repeat.</dd>
@@ -266,6 +285,7 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); 
           <dt>.fast(2) .slow(2)</dt><dd>Change speed by a whole number.</dd>
           <dt>.arp("up") .add(12)</dt><dd>Arpeggiate chords; transpose in semitones.</dd>
           <dt>.degradeBy(0.3)</dt><dd>Randomly drop 30% of notes.</dd>
+          <dt>.swing(60) .humanize(0.3)</dt><dd>Groove for one layer. Otherwise the Groove controls apply.</dd>
           <dt>setbpm(124)</dt><dd>Tempo, shared with the drum machine.</dd>
         </dl>
       </div>
@@ -379,12 +399,36 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); 
       <button class="btn small" id="seqMatchA" style="--c:var(--a)">Match A</button>
       <button class="btn small" id="seqMatchB" style="--c:var(--b)">Match B</button>
       <div class="grow"></div>
-      <span class="label">Vol</span>
-      <input id="seqVol" type="range" min="0" max="1" step="0.01" value="0.7" style="width:100px" aria-label="Drum machine volume">
+      <span class="groove-ctl" style="flex:0 0 auto;min-width:0"><span class="label">Vol</span>
+      <input id="seqVol" type="range" min="0" max="1" step="0.01" value="0.7" style="width:100px" aria-label="Drum machine volume"></span>
       <button class="btn small" id="seqRandom">Randomize</button>
       <button class="btn small" id="seqClear">Clear</button>
     </div>
-    <div class="grid-scroll"><div class="grid" id="grid"></div></div>
+    <div class="groove">
+      <div class="groove-row">
+        <span class="label">Groove</span>
+        <button class="btn play" id="grooveAdd" title="Adds swing, a little human feel, accented hats and ghost snares">Add groove</button>
+        <select class="select" id="groovePreset" aria-label="Groove style">
+          <option value="">Pick a feel…</option>
+          <option value="straight">Straight (no groove)</option>
+          <option value="light">Light swing</option>
+          <option value="house">House bounce</option>
+          <option value="garage">UK garage shuffle</option>
+          <option value="hiphop">Lazy hip-hop</option>
+          <option value="blues">Triplet shuffle</option>
+        </select>
+        <label class="groove-ctl" for="grooveSwing"><span class="label">Swing</span>
+          <input id="grooveSwing" type="range" min="50" max="75" step="1" value="50"><output id="grooveSwingOut">50%</output></label>
+        <label class="groove-ctl" for="grooveHuman"><span class="label">Humanize</span>
+          <input id="grooveHuman" type="range" min="0" max="1" step="0.05" value="0"><output id="grooveHumanOut">0%</output></label>
+        <select class="select" id="grooveGrid" aria-label="Swing on">
+          <option value="16">Swing 16ths</option>
+          <option value="8">Swing 8ths</option>
+        </select>
+      </div>
+      <p class="hint" id="grooveMsg">Groove means notes sit a little off the grid and aren't all equally loud. Swing pushes every second note late. Humanize adds tiny random changes to timing and volume. It applies to the drums, the live code and your loop. Click a step to cycle it: on, accent (amber), ghost (soft), off.</p>
+    </div>
+    <div class="grid" id="grid"></div>
   </section>
 </div>
 
@@ -472,14 +516,72 @@ const Voices = {
   ohat(c, d, t, v = 1) {
     noiseSrc(c, t, 0.4).connect(filt(c, "highpass", 7000)).connect(envGain(c, t, 0.002, 0.28 * v, 0.32)).connect(d);
   },
-  bass(c, d, t, freq, len, v = 1, cutoff = 2200) {
+  // Saw for bite plus a sine underneath for weight; the note holds for its full length.
+  bass(c, d, t, freq, len, v = 1, cutoff = 900) {
+    const f = filt(c, "lowpass", cutoff * 2, 1.2);
+    f.frequency.setValueAtTime(cutoff * 2, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.6), t + Math.min(0.25, Math.max(0.02, len)));
+    const g = c.createGain(), peak = 0.34 * v, end = t + Math.max(0.06, len), body = t + Math.max(0.01, Math.min(len, 0.3));
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(peak * 0.6, body);
+    g.gain.setValueAtTime(peak * 0.6, Math.max(body, end));
+    g.gain.exponentialRampToValueAtTime(0.0001, Math.max(body, end) + 0.05);
+    f.connect(g).connect(d);
+    for (const [type, amt] of [["sawtooth", 0.55], ["sine", 0.9]]) {
+      const o = c.createOscillator(), a = c.createGain();
+      o.type = type; o.frequency.value = freq; a.gain.value = amt;
+      o.connect(a).connect(type === "sine" ? g : f);
+      o.start(t); o.stop(Math.max(body, end) + 0.1);
+    }
+  },
+  rim(c, d, t, v = 1) {
     const o = c.createOscillator();
-    o.type = "sawtooth"; o.frequency.value = freq;
-    const f = filt(c, "lowpass", cutoff, 7);
-    f.frequency.setValueAtTime(cutoff, t);
-    f.frequency.exponentialRampToValueAtTime(180, t + len);
-    o.connect(f).connect(envGain(c, t, 0.005, 0.32 * v, len)).connect(d);
-    o.start(t); o.stop(t + len + 0.05);
+    o.type = "triangle"; o.frequency.value = 1750;
+    o.connect(envGain(c, t, 0.001, 0.4 * v, 0.03)).connect(d);
+    o.start(t); o.stop(t + 0.06);
+    noiseSrc(c, t, 0.04).connect(filt(c, "bandpass", 2600, 1.5)).connect(envGain(c, t, 0.001, 0.35 * v, 0.02)).connect(d);
+  },
+  tom(c, d, t, v = 1, f0 = 130) {
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(f0 * 1.6, t);
+    o.frequency.exponentialRampToValueAtTime(f0, t + 0.12);
+    o.connect(envGain(c, t, 0.002, 0.6 * v, 0.35)).connect(d);
+    o.start(t); o.stop(t + 0.45);
+  },
+  lt(c, d, t, v = 1) { Voices.tom(c, d, t, v, 90); },
+  mt(c, d, t, v = 1) { Voices.tom(c, d, t, v, 130); },
+  ht(c, d, t, v = 1) { Voices.tom(c, d, t, v, 185); },
+  conga(c, d, t, v = 1) {
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(330, t);
+    o.frequency.exponentialRampToValueAtTime(290, t + 0.05);
+    o.connect(envGain(c, t, 0.001, 0.45 * v, 0.22)).connect(d);
+    o.start(t); o.stop(t + 0.3);
+  },
+  shaker(c, d, t, v = 1) {
+    noiseSrc(c, t, 0.12).connect(filt(c, "highpass", 5500)).connect(envGain(c, t, 0.012, 0.2 * v, 0.06)).connect(d);
+  },
+  cowbell(c, d, t, v = 1) {
+    const bp = filt(c, "bandpass", 800, 2);
+    bp.connect(envGain(c, t, 0.001, 0.3 * v, 0.28)).connect(d);
+    for (const fr of [540, 800]) { const o = c.createOscillator(); o.type = "square"; o.frequency.value = fr; o.connect(bp); o.start(t); o.stop(t + 0.32); }
+  },
+  crash(c, d, t, v = 1) {
+    noiseSrc(c, t, 1.6).connect(filt(c, "highpass", 4000)).connect(envGain(c, t, 0.002, 0.32 * v, 1.4)).connect(d);
+  },
+  ride(c, d, t, v = 1) {
+    noiseSrc(c, t, 0.8).connect(filt(c, "highpass", 7000)).connect(envGain(c, t, 0.001, 0.14 * v, 0.6)).connect(d);
+    const hp = filt(c, "highpass", 3000);
+    hp.connect(envGain(c, t, 0.001, 0.06 * v, 0.5)).connect(d);
+    for (const fr of [520, 790, 1130]) { const o = c.createOscillator(); o.type = "square"; o.frequency.value = fr; o.connect(hp); o.start(t); o.stop(t + 0.6); }
+  },
+  sub808(c, d, t, v = 1) {
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(50, t + 0.06);
+    o.connect(envGain(c, t, 0.002, 0.9 * v, 1.1)).connect(d);
+    o.start(t); o.stop(t + 1.2);
   },
   chord(c, d, t, notes, len, v = 1) {
     const f = filt(c, "lowpass", 1500, 1.5);
@@ -1055,7 +1157,13 @@ applyX();
 $("#masterVol").addEventListener("input", e => master.gain.setTargetAtTime(e.target.value * e.target.value / 0.7225 * 0.85, ctx.currentTime, 0.01));
 
 /* ---------- drum machine ---------- */
-const ROWS = [["kick", "Kick"], ["snare", "Snare"], ["clap", "Clap"], ["hat", "Hat"], ["ohat", "Open hat"]];
+const ROWS = [
+  ["kick", "Kick"], ["snare", "Snare"], ["clap", "Clap"], ["rim", "Rim"], ["hat", "Hat"], ["ohat", "Open hat"],
+  ["shaker", "Shaker"], ["mt", "Tom"], ["cowbell", "Cowbell"], ["crash", "Crash"],
+];
+// step levels: click cycles off -> on -> accent -> ghost -> off
+const LEVEL = { on: 0.85, accent: 1.15, ghost: 0.4 };
+const NEXT_LEVEL = { 0: LEVEL.on, [LEVEL.on]: LEVEL.accent, [LEVEL.accent]: LEVEL.ghost, [LEVEL.ghost]: 0 };
 const pattern = {
   kick: [0, 4, 8, 12], snare: [], clap: [4, 12], hat: [0, 1, 3, 5, 7, 9, 11, 13, 15], ohat: [2, 6, 10, 14],
 };
@@ -1065,25 +1173,51 @@ seqOut.gain.value = 0.49;
 seqOut.connect(master);
 const grid = $("#grid");
 for (const [key, label] of ROWS) {
-  const name = document.createElement("div");
-  name.className = "row-name"; name.textContent = label;
-  grid.appendChild(name);
+  const row = document.createElement("div"), name = document.createElement("div"), cells = document.createElement("div");
+  row.className = "seq-row"; name.className = "row-name"; cells.className = "cells";
+  name.textContent = label;
+  row.append(name, cells);
+  grid.appendChild(row);
   steps[key] = [];
   for (let i = 0; i < 16; i++) {
     const b = document.createElement("button");
-    b.className = "step" + (i % 4 === 0 ? " beat" : "") + (key === "kick" ? "" : "");
-    b.setAttribute("aria-label", `${label} step ${i + 1}`);
-    b.setAttribute("aria-pressed", String(pattern[key].includes(i)));
-    b.addEventListener("click", () => b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")));
-    grid.appendChild(b);
+    b.className = "step" + (i % 4 === 0 ? " beat" : "");
+    b.dataset.name = `${label} step ${i + 1}`;
+    setStep(b, pattern[key]?.includes(i) ? LEVEL.on : 0);
+    b.addEventListener("click", () => setStep(b, NEXT_LEVEL[stepVel(b)] ?? 0));
+    cells.appendChild(b);
     steps[key].push(b);
   }
 }
+function setStep(b, v) {
+  b.dataset.v = v;
+  const level = v === LEVEL.accent ? "accent" : v === LEVEL.ghost ? "ghost" : v ? "on" : "off";
+  b.dataset.level = level;
+  b.setAttribute("aria-pressed", String(v > 0));
+  b.setAttribute("aria-label", `${b.dataset.name}, ${level}`);
+}
+function stepVel(b) { return Number(b.dataset.v) || 0; }
+
+/* groove: swing pushes every second 16th (or 8th) late; humanize jitters timing and level */
+const groove = { swing: 50, humanize: 0, grid: 16 };
+function grooveShift(pos16, s16, ctl = {}) {
+  const sw = ctl.swing ?? groove.swing, hu = ctl.humanize ?? groove.humanize, per = groove.grid === 8 ? 2 : 1;
+  const pos = pos16 / per, n = Math.round(pos);
+  let dt = 0;
+  if (Math.abs(pos - n) < 0.02 && ((n % 2) + 2) % 2 === 1) dt += (sw / 50 - 1) * s16 * per;
+  if (hu) dt += (Math.random() * 2 - 1) * hu * 0.012;
+  return dt;
+}
+function grooveVel(ctl = {}) { const hu = ctl.humanize ?? groove.humanize; return 1 + (Math.random() * 2 - 1) * hu * 0.3; }
+
 const seq = { bpm: 124, step: 0, next: 0, playing: false, timer: 0, queue: [], shown: -1 };
 function schedule() {
   const s16 = 60 / seq.bpm / 4;
   while (seq.next < ctx.currentTime + 0.12) {
-    for (const [key] of ROWS) if (steps[key][seq.step].getAttribute("aria-pressed") === "true") Voices[key](ctx, seqOut, seq.next);
+    for (const [key] of ROWS) {
+      const v = stepVel(steps[key][seq.step]);
+      if (v) Voices[key](ctx, seqOut, Math.max(ctx.currentTime, seq.next + grooveShift(seq.step, s16)), v * grooveVel());
+    }
     seq.queue.push({ step: seq.step, time: seq.next });
     seq.next += s16;
     seq.step = (seq.step + 1) % 16;
@@ -1121,14 +1255,50 @@ seqBpm.addEventListener("input", () => setSeqBpm(parseFloat(seqBpm.value)));
 $("#seqMatchA").addEventListener("click", () => deckA.bpmNow() && setSeqBpm(deckA.bpmNow()));
 $("#seqMatchB").addEventListener("click", () => deckB.bpmNow() && setSeqBpm(deckB.bpmNow()));
 $("#seqVol").addEventListener("input", e => seqOut.gain.setTargetAtTime(e.target.value * e.target.value, ctx.currentTime, 0.01));
-$("#seqClear").addEventListener("click", () => { for (const [k] of ROWS) for (const b of steps[k]) b.setAttribute("aria-pressed", "false"); });
+$("#seqClear").addEventListener("click", () => { for (const [k] of ROWS) for (const b of steps[k]) setStep(b, 0); });
 $("#seqRandom").addEventListener("click", () => {
-  const odds = { kick: [0.95, 0.05, 0.15, 0.1], snare: [0.05, 0.1, 0.2, 0.25], clap: [0.1, 0, 0.05, 0.05], hat: [0.3, 0.5, 0.7, 0.5], ohat: [0, 0, 0.6, 0.05] };
+  const odds = {
+    kick: [0.95, 0.05, 0.15, 0.1], snare: [0.05, 0.1, 0.2, 0.25], clap: [0.1, 0, 0.05, 0.05], hat: [0.3, 0.5, 0.7, 0.5], ohat: [0, 0, 0.6, 0.05],
+    rim: [0, 0.1, 0.05, 0.2], shaker: [0.2, 0.5, 0.3, 0.5], mt: [0, 0.05, 0.05, 0.1], cowbell: [0, 0.05, 0.1, 0.05], crash: [0, 0, 0, 0],
+  };
   for (const [k] of ROWS) steps[k].forEach((b, i) => {
     let p = odds[k][i % 4];
     if (k === "clap" && (i === 4 || i === 12)) p = 0.95;
-    b.setAttribute("aria-pressed", String(Math.random() < p));
+    if (k === "crash" && i === 0) p = 0.3;
+    setStep(b, Math.random() < p ? LEVEL.on : 0);
   });
+});
+
+const swingIn = $("#grooveSwing"), humanIn = $("#grooveHuman");
+function setGroove(swing, humanize) {
+  groove.swing = swing; groove.humanize = humanize;
+  swingIn.value = swing; humanIn.value = humanize;
+  $("#grooveSwingOut").textContent = Math.round(swing) + "%";
+  $("#grooveHumanOut").textContent = Math.round(humanize * 100) + "%";
+}
+swingIn.addEventListener("input", () => setGroove(Number(swingIn.value), groove.humanize));
+humanIn.addEventListener("input", () => setGroove(groove.swing, Number(humanIn.value)));
+$("#grooveGrid").addEventListener("change", e => { groove.grid = Number(e.target.value); });
+const GROOVES = {
+  straight: [50, 0, 16], light: [54, 0.1, 16], house: [58, 0.15, 16], garage: [64, 0.1, 16], hiphop: [62, 0.35, 16], blues: [66, 0.1, 8],
+};
+$("#groovePreset").addEventListener("change", e => {
+  const g = GROOVES[e.target.value];
+  if (!g) return;
+  setGroove(g[0], g[1]);
+  groove.grid = g[2]; $("#grooveGrid").value = String(g[2]);
+  e.target.value = "";
+});
+// One click: swing, a little human feel, and the accents and ghost notes a drummer would play.
+$("#grooveAdd").addEventListener("click", () => {
+  setGroove(58, 0.2);
+  groove.grid = 16; $("#grooveGrid").value = "16";
+  steps.hat.forEach((b, i) => { if (stepVel(b)) setStep(b, i % 4 === 2 ? LEVEL.accent : i % 2 ? LEVEL.ghost : LEVEL.on); });
+  steps.ohat.forEach(b => { if (stepVel(b)) setStep(b, LEVEL.accent); });
+  for (const i of [7, 15]) if (!stepVel(steps.snare[i])) setStep(steps.snare[i], LEVEL.ghost);
+  for (const i of [3, 11]) if (!stepVel(steps.shaker[i])) setStep(steps.shaker[i], LEVEL.ghost);
+  if (stepVel(steps.kick[0])) setStep(steps.kick[0], LEVEL.accent);
+  $("#grooveMsg").textContent = "Groove added: 58% swing, 20% humanize, accented off-beat hats, ghost snares and shaker. Press Start to hear it, and move the sliders to taste.";
 });
 
 /* ---------- live code: a small Strudel-style pattern language ---------- */
@@ -1239,6 +1409,8 @@ class Pattern {
     }));
   }
   degradeBy(p) { return this._with(c => this.q(c).filter(() => Math.random() >= p)); }
+  swing(v) { return this._set("swing", clamp(v, 50, 75)); }
+  humanize(v) { return this._set("humanize", clamp(v, 0, 1)); }
   s(v) { return this._set("s", v); }
   sound(v) { return this.s(v); }
   gain(v) { return this._set("gain", (this.ctl.gain ?? 1) * v); }
@@ -1286,8 +1458,12 @@ function evaluateCode(code) {
   return LiveAPI.stack(...layers);
 }
 
-const DRUMS = { bd: "kick", kick: "kick", sd: "snare", snare: "snare", cp: "clap", clap: "clap", hh: "hat", hat: "hat", oh: "ohat", ohat: "ohat" };
-const DRUM_ROW = { kick: 0, snare: 1, clap: 2, hat: 3, ohat: 4 };
+const DRUMS = {
+  bd: "kick", kick: "kick", sd: "snare", snare: "snare", cp: "clap", clap: "clap", hh: "hat", hat: "hat", oh: "ohat", ohat: "ohat",
+  rim: "rim", rs: "rim", lt: "lt", mt: "mt", tom: "mt", ht: "ht", conga: "conga", sh: "shaker", shaker: "shaker",
+  cb: "cowbell", cowbell: "cowbell", cr: "crash", crash: "crash", rd: "ride", ride: "ride", "808": "sub808",
+};
+const DRUM_ROW = { kick: 0, sub808: 0, lt: 0, snare: 1, rim: 1, mt: 1, ht: 1, conga: 1, clap: 2, cowbell: 2, hat: 3, shaker: 3, ride: 3, ohat: 4, crash: 4 };
 const liveOut = ctx.createGain();
 liveOut.gain.value = 0.8;
 liveOut.connect(master);
@@ -1297,8 +1473,8 @@ const SYNTHS = ["keys", "bass", "pad", "pluck", "sine", "square", "triangle", "s
 // Oscillators -> low-pass -> envelope. Callers shape env.gain.
 function buildTone(type, midis, T, ctl, dest) {
   const pad = type === "pad" || type === "supersaw", pluck = type === "pluck", keys = type === "keys", bass = type === "bass";
-  const cutoff = ctl.lpf ?? (pad ? 1600 : pluck ? 3200 : bass ? 1400 : keys ? 5000 : 14000);
-  const f = filt(ctx, "lowpass", cutoff, pluck || bass ? 3 : 0.7);
+  const cutoff = ctl.lpf ?? (pad ? 1600 : pluck ? 3200 : bass ? 900 : keys ? 5000 : 14000);
+  const f = filt(ctx, "lowpass", cutoff, pluck ? 3 : bass ? 1.2 : 0.7);
   f.frequency.setValueAtTime(cutoff, T);
   const env = ctx.createGain();
   env.gain.value = 0;
@@ -1306,7 +1482,7 @@ function buildTone(type, midis, T, ctl, dest) {
   const level = (pad ? 0.09 : bass ? 0.3 : keys ? 0.24 : 0.2) * (ctl.gain ?? 1) / Math.sqrt(midis.length);
   const layers = pad || pluck ? [["sawtooth", -10, 1], ["sawtooth", 10, 1]]
     : keys ? [["triangle", 0, 1], ["sine", 1200, 0.3]]
-    : bass ? [["sawtooth", 0, 1], ["square", -1200, 0.5]]
+    : bass ? [["sawtooth", 0, 1], ["sine", 0, 0.9]]
     : [[["sine", "square", "triangle", "sawtooth"].includes(type) ? type : "triangle", 0, 1]];
   const oscs = [];
   for (const m of midis) for (const [wave, det, amt] of layers) {
@@ -1320,7 +1496,7 @@ function buildTone(type, midis, T, ctl, dest) {
 }
 
 function playSynth(type, midis, T, D, ctl, dest) {
-  if (type === "bass") { for (const m of midis) Voices.bass(ctx, dest, T, mtof(m), ctl.decay ?? Math.max(0.08, D * 0.95), ctl.gain ?? 1, ctl.lpf ?? 2200); return; }
+  if (type === "bass") { for (const m of midis) Voices.bass(ctx, dest, T, mtof(m), ctl.decay ?? Math.max(0.08, D * 0.95), ctl.gain ?? 1, ctl.lpf ?? 900); return; }
   const v = buildTone(type, midis, T, ctl, dest), g = v.env.gain, peak = Math.max(v.level, 0.0002);
   let end;
   if (v.pad) {
@@ -1371,7 +1547,7 @@ function playEvent(e, T, D) {
     const drum = DRUMS[e.v];
     if (drum) { Voices[drum](ctx, dest, T, ctl.gain ?? 1); visit(DRUM_ROW[drum]); }
     else if (SYNTHS.includes(e.v)) { playSynth(e.v, [48 + (ctl.add || 0)], T, D, ctl, dest); visit(null, 48); }
-    else throw new Error(`No sound called "${e.v}". Drums are bd, sd, cp, hh, oh.`);
+    else throw new Error(`No sound called "${e.v}". Drums: bd sd cp hh oh rim lt mt ht conga sh cb cr rd 808.`);
   } else if (e.kind === "note") {
     const m = noteToMidi(e.v) + (ctl.add || 0);
     playSynth(ctl.s || "triangle", [m], T, D, ctl, dest); visit(null, m);
@@ -1389,8 +1565,11 @@ function liveTick() {
     if (live.pattern) {
       try {
         for (const e of live.pattern.query(live.cycle)) {
-          const T = live.cycleStart + e.t0 * dur;
-          if (T >= ctx.currentTime - 0.005) playEvent(e, T, (e.t1 - e.t0) * dur);
+          const T0 = live.cycleStart + e.t0 * dur;
+          if (T0 < ctx.currentTime - 0.005) continue;
+          const T = Math.max(ctx.currentTime, T0 + grooveShift(e.t0 * 16, dur / 16, e.ctl));
+          e.ctl.gain = (e.ctl.gain ?? 1) * grooveVel(e.ctl);
+          playEvent(e, T, (e.t1 - e.t0) * dur);
         }
       } catch (err) { liveMsg(err.message); }
     }
@@ -1687,7 +1866,9 @@ function loopTick() {
     for (let p = Math.floor((loop.cursor - loop.anchor) / L); p <= Math.floor((horizon - loop.anchor) / L); p++) {
       for (const n of notes) {
         const T = loop.anchor + (p + n.t0) * L;
-        if (T >= loop.cursor && T < horizon) playSynth(n.sound, [n.m], T, n.d * L, {}, keysOut);
+        if (T < loop.cursor || T >= horizon) continue;
+        const s16 = L / (16 * loop.bars);
+        playSynth(n.sound, [n.m], Math.max(ctx.currentTime, T + grooveShift(n.t0 * 16 * loop.bars, s16)), n.d * L, { gain: grooveVel() }, keysOut);
       }
     }
   }
