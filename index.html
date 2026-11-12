@@ -257,6 +257,14 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); 
         <option value="house">Night bus house</option>
         <option value="disco">Arp disco</option>
         <option value="techno">Minimal techno</option>
+        <optgroup label="UK garage">
+          <option value="garage2step">2-step garage</option>
+          <option value="speedgarage">Speed garage</option>
+        </optgroup>
+        <optgroup label="Boom bap">
+          <option value="boombap">Classic boom bap</option>
+          <option value="jazzybap">Jazzy boom bap</option>
+        </optgroup>
       </select>
       <div class="spacer"></div>
       <span class="hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> runs, <kbd>Ctrl</kbd>+<kbd>.</kbd> stops. Edits switch in at the next bar.</span>
@@ -285,8 +293,10 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); 
           <dt>.fast(2) .slow(2)</dt><dd>Change speed by a whole number.</dd>
           <dt>.arp("up") .add(12)</dt><dd>Arpeggiate chords; transpose in semitones.</dd>
           <dt>.degradeBy(0.3)</dt><dd>Randomly drop 30% of notes.</dd>
+          <dt>.struct("x ~ x ~")</dt><dd>Play the notes or chords only where the x's are.</dd>
           <dt>.swing(60) .humanize(0.3)</dt><dd>Groove for one layer. Otherwise the Groove controls apply.</dd>
           <dt>setbpm(124)</dt><dd>Tempo, shared with the drum machine.</dd>
+          <dt>setswing(64) sethumanize(0.2)</dt><dd>Set the Groove sliders from code. <code>setswing(64, 8)</code> swings 8ths.</dd>
         </dl>
       </div>
     </div>
@@ -1409,6 +1419,17 @@ class Pattern {
     }));
   }
   degradeBy(p) { return this._with(c => this.q(c).filter(() => Math.random() >= p)); }
+  // Give a pattern a new rhythm: each x plays whatever this pattern holds at that moment.
+  struct(str) {
+    const tree = parseMini(str);
+    return this._with(c => {
+      const shape = [];
+      evalNode(tree, c, 0, 1, shape);
+      const src = this.q(c);
+      return shape.filter(s => s.v !== "0" && s.v !== "f").flatMap(s =>
+        src.filter(e => e.t0 <= s.t0 + 1e-9 && s.t0 < e.t1 - 1e-9).map(e => ({ ...e, t0: s.t0, t1: s.t1 })));
+    });
+  }
   swing(v) { return this._set("swing", clamp(v, 50, 75)); }
   humanize(v) { return this._set("humanize", clamp(v, 0, 1)); }
   s(v) { return this._set("s", v); }
@@ -1428,6 +1449,8 @@ const LiveAPI = {
   silence: () => new Pattern(() => [], "sound"),
   setbpm: v => setSeqBpm(v),
   setcpm: v => setSeqBpm(v * 4),
+  setswing: (v, grid = 16) => { setGroove(clamp(v, 50, 75), groove.humanize); groove.grid = grid === 8 ? 8 : 16; $("#grooveGrid").value = String(groove.grid); },
+  sethumanize: v => setGroove(groove.swing, clamp(v, 0, 1)),
 };
 // Lines that start with $: are layers. Anything before the first one runs once (e.g. setbpm).
 function evaluateCode(code) {
@@ -1655,6 +1678,77 @@ $: note("<f1*4 db1*4 ab1*4 eb1*4>").s("bass")
 
 _$: chord("<Fm7 Dbmaj7 Ab Eb>").s("pad")   // remove the _ to unmute
 `,
+  garage2step: `// UK garage, 2-step. Each [ ] is one beat, split into four 16ths.
+// The kick skips beat 3, and heavy swing gives the shuffle.
+setbpm(132)
+setswing(66)
+sethumanize(0.15)
+
+$: s("[bd ~ ~ ~] [~ ~ ~ ~] [~ ~ bd ~] [~ ~ ~ ~]")
+
+$: s("[~ ~ ~ ~] [sd ~ ~ rim] [~ ~ ~ ~] [sd ~ rim ~]")
+
+$: s("hh*16").gain(0.45).degradeBy(0.2)
+
+$: s("[~ ~ oh ~]*4").gain(0.5)
+
+// organ-style stabs: struct() sets where each chord hits
+$: chord("<Fm9 Dbmaj7 Bbm9 C7>").struct("[~ x ~ ~] [~ ~ x ~] [~ x ~ ~] [x ~ ~ ~]").s("keys").gain(0.8)
+
+$: note("<f2 db2 bb1 c2>").struct("[x ~ ~ ~] [~ ~ x ~] [~ ~ x ~] [~ x ~ ~]").s("bass").lpf(700)
+`,
+  speedgarage: `// Speed garage: four-to-the-floor kick, open hats on the off-beat,
+// and a bassline that bounces between octaves.
+setbpm(134)
+setswing(60)
+sethumanize(0.1)
+
+$: s("bd*4")
+
+$: s("[~ oh]*4").gain(0.6)
+
+$: s("[~ ~ ~ ~] [sd ~ ~ ~] [~ ~ ~ rim] [sd ~ ~ ~]")
+
+$: s("hh*16").gain(0.35).humanize(0.3)
+
+$: note("<[g1 ~ g2 ~ ~ g1 ~ g2] [g1 ~ g2 ~ ~ g1 bb1 c2]>").s("bass").lpf(1100)
+
+$: chord("<Gm7 Gm7 Ebmaj7 F>").struct("[~ x ~ ~]*2").s("pluck").gain(0.5)
+`,
+  boombap: `// Boom bap: slow and heavy. Big kick, cracking snare on 2 and 4,
+// lazy swing and loose timing like an old drum machine.
+setbpm(90)
+setswing(62)
+sethumanize(0.3)
+
+$: s("[bd ~ ~ bd] [~ ~ ~ ~] [~ ~ bd ~] [~ ~ ~ ~]").gain(1.1)
+
+$: s("[~ ~ ~ ~] [sd ~ ~ ~] [~ ~ ~ ~] [sd ~ ~ ~], [~ ~ ~ ~] [~ ~ ~ rim] [~ ~ ~ ~] [~ rim ~ ~]")
+
+$: s("hh*16").gain(0.4).degradeBy(0.15)
+
+$: chord("<Cm9 Cm9 Abmaj7 G7>").s("keys").gain(0.85)
+
+$: note("<c2 c2 ab1 g1>").struct("[x ~ ~ x] [~ ~ ~ ~] [~ ~ x ~] [~ ~ ~ ~]").s("bass").lpf(600)
+`,
+  jazzybap: `// Jazzy boom bap: a ii-V-I chord loop, swung 8ths and a drunk feel.
+setbpm(86)
+setswing(64, 8)
+sethumanize(0.35)
+
+$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] [~ ~ ~ ~]")
+
+$: s("[~ ~ ~ ~] [sd ~ ~ ~] [~ ~ ~ ~] [sd ~ ~ sd]").gain(0.9)
+
+$: s("hh*8, [~ ~ ~ oh]").gain(0.5)
+
+$: chord("<Dm9 G9 Cmaj7 A7>").s("keys").gain(0.8)
+
+$: note("<d2 g1 c2 a1>").struct("[x ~ ~ ~] [~ ~ x ~] [x ~ ~ ~] [~ ~ ~ ~]").s("bass").lpf(500)
+
+// a little piano noodle over the top
+$: chord("<Dm9 G9 Cmaj7 A7>").arp("up").add(12).s("pluck").lpf(1800).gain(0.3).degradeBy(0.4)
+`,
   techno: `setbpm(130)
 
 $: s("bd*4")
@@ -1670,7 +1764,12 @@ $: note("<g4 eb5 c5 bb4>*2").s("sine").degradeBy(0.3).gain(0.5).pan(0.4)
 };
 $("#codeExample").addEventListener("change", e => {
   const ex = EXAMPLES[e.target.value];
-  if (ex) { codeEl.value = ex; if (live.playing) runCode(); }
+  if (ex) {
+    // each example sets its own groove; start from straight so they don't carry over
+    setGroove(50, 0); groove.grid = 16; $("#grooveGrid").value = "16";
+    codeEl.value = ex;
+    if (live.playing) runCode();
+  }
   e.target.value = "";
 });
 let savedCode = null;

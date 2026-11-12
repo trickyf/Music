@@ -14,7 +14,7 @@ $: chord("<Am Am F G>").s("pad").gain(0.7)
 $: note("[a4 c5 e5 c5]*2").s("pluck").degradeBy(0.25).gain(0.35)
 ```
 
-The reference beside the editor lists every function. Mini-notation supports `~` rests, `[a b]` to squeeze notes into one step, `<a b>` to alternate each bar, `a*4` to repeat, `a!3` to copy, `a?` for maybe, and `a, b` to play both at once.
+The Examples menu has house, disco and techno loops, plus two UK garage (2-step, speed garage) and two boom bap (classic, jazzy) beats. The reference beside the editor lists every function, including `.struct("x ~ x ~")` to put chords or bass on a rhythm and `setswing()` / `sethumanize()` to set the groove from code. Mini-notation supports `~` rests, `[a b]` to squeeze notes into one step, `<a b>` to alternate each bar, `a*4` to repeat, `a!3` to copy, `a?` for maybe, and `a, b` to play both at once.
 
 **Keys and looper.** Play with your computer keyboard (`A` to `'` are the white keys, `W` to `P` the black keys, `Z`/`X` change octave) or tap the on-screen piano. It names the chord you're holding, inversions included. **Chord mode** turns each key into a full chord from the key you pick, so anyone can play a progression. **Record loop** layers what you play over 1, 2 or 4 bars, in time with the code and the drum machine.
 
